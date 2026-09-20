@@ -22,6 +22,7 @@ export type BoardData = {
   updated: string | null; // "Sep 20, 3:00 PM ET"
   gapLabel: string;
   players: Player[];
+   reason? string;
 };
 
 // Edge score cutoffs that decide each call.
