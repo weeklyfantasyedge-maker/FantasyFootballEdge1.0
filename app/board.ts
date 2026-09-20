@@ -22,7 +22,7 @@ export type BoardData = {
   updated: string | null; // "Sep 20, 3:00 PM ET"
   gapLabel: string;
   players: Player[];
-   reason? string;
+  reason?: string; // why the demo board is showing (for troubleshooting)
 };
 
 // Edge score cutoffs that decide each call.
