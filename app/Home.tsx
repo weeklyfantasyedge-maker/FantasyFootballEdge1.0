@@ -19,11 +19,41 @@ const HERO_BARS = [22, 30, 26, 40, 34, 52, 46, 64, 58, 76, 70, 90, 84, 100];
 
 const PAGE_SIZE = 25;
 
-const FACTORS: { letter: string; title: string; text: string; status?: string }[] = [
-  { letter: "E", title: "Efficiency", text: "How many points he is projected to produce per opportunity." },
-  { letter: "D", title: "Deployment", text: "Expected carries, targets, or pass attempts. Role is the most stable signal in fantasy." },
-  { letter: "G", title: "Game environment", text: "Spread, game total, pace, and weather. Points come from games that produce plays.", status: "Coming soon" },
-  { letter: "E", title: "Expected gap", text: "How far his projection sits above a replacement-level starter at his position. That gap is the edge." },
+type Factor = {
+  letter: string;
+  title: string;
+  bullets: string[];
+  status: "Live" | "Partly live" | "Coming soon";
+  live?: string; // what is actually powering the score today
+};
+
+const FACTORS: Factor[] = [
+  {
+    letter: "E",
+    title: "Environment",
+    bullets: ["Vegas total & spread", "Expected game script", "Weather & stadium"],
+    status: "Coming soon",
+  },
+  {
+    letter: "D",
+    title: "Deployment",
+    bullets: ["Snap %", "Target & carry share", "First-read share", "Red-zone usage"],
+    status: "Partly live",
+    live: "Live now: expected carries, targets, and pass attempts.",
+  },
+  {
+    letter: "G",
+    title: "Game Matchup",
+    bullets: ["Defensive DVOA & EPA", "Coverage matchup", "Run/pass tendencies"],
+    status: "Coming soon",
+  },
+  {
+    letter: "E",
+    title: "Evidence",
+    bullets: ["Last 2–3 games", "Season baseline", "Injury trends"],
+    status: "Partly live",
+    live: "Live now: injury designations.",
+  },
 ];
 
 /* ==========================================================
@@ -181,14 +211,16 @@ export default function Home({ board }: { board: BoardData }) {
 
             {board.live ? (
               <p className="live-note">
-                Live from Sleeper projections, refreshed {board.updated}. The Edge score
-                blends projected points, expected workload, and efficiency, with a
-                penalty for injury designations.
+                Live from Sleeper projections, refreshed {board.updated}. Today&apos;s Edge
+                score blends projected points, expected workload, and efficiency, with a
+                penalty for injury designations. The rest of the EDGE Framework is rolling
+                in.
               </p>
             ) : (
               <p className="demo-note">
                 Demo data. These players and scores are placeholders until the live
                 weekly board is published.
+                {board.reason && <span className="reason">Why: {board.reason}</span>}
               </p>
             )}
 
@@ -331,9 +363,7 @@ export default function Home({ board }: { board: BoardData }) {
           <div className="wrap">
             <h2 className="h2">How the Edge score works</h2>
             <p className="lede">
-              Every player is scored on four things. Three are live today, and game
-              environment is coming next. The scores blend into one number, and the call
-              follows from it.
+              Every player is evaluated through the EDGE Framework:
             </p>
             <div className="method-grid">
               {FACTORS.map((f) => (
@@ -342,8 +372,19 @@ export default function Home({ board }: { board: BoardData }) {
                     {f.letter}
                   </div>
                   <h3>{f.title}</h3>
-                  {f.status && <span className="factor-tag">{f.status}</span>}
-                  <p>{f.text}</p>
+                  <span
+                    className={
+                      f.status === "Coming soon" ? "factor-tag" : "factor-tag is-live"
+                    }
+                  >
+                    {f.status}
+                  </span>
+                  <ul className="factor-list">
+                    {f.bullets.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                  {f.live && <p className="factor-live">{f.live}</p>}
                 </div>
               ))}
             </div>

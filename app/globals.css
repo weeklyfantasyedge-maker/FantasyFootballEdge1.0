@@ -839,3 +839,48 @@ a {
   font-weight: 700;
   font-size: 0.95rem;
 }
+
+.reason {
+  display: block;
+  margin-top: 0.6rem;
+  color: var(--steel);
+  font-size: 0.85rem;
+  word-break: break-word;
+}
+
+/* ---------- EDGE Framework bullets ---------- */
+
+.factor-tag.is-live {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.factor-list {
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.factor-list li {
+  position: relative;
+  padding-left: 1.1rem;
+  margin-top: 0.35rem;
+  color: #dfe5ea;
+  font-size: 1.02rem;
+}
+
+.factor-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.72em;
+  width: 0.55rem;
+  height: 3px;
+  background: var(--green);
+}
+
+.factor .factor-live {
+  margin: 0.9rem 0 0;
+  color: var(--steel);
+  font-size: 0.92rem;
+}
