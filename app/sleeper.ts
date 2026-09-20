@@ -12,7 +12,9 @@
    site never shows an error page.
    ========================================================== */
 
-import { DEMO_BOARD, DEMO_WEEK } from "./board";
+import { DEMO_BOARD } from "./board";
+import { getGameLines } from "./odds";
+import type { GameLine } from "./odds";
 import type { BoardData, Player, Pos } from "./board";
 
 /* ---------- Settings you can change ---------- */
@@ -28,9 +30,14 @@ const POOL: Record<Pos, number> = { QB: 30, RB: 60, WR: 80, TE: 30 };
 const REPLACEMENT: Record<Pos, number> = { QB: 12, RB: 30, WR: 36, TE: 12 };
 
 // How much each piece counts toward the 0 to 100 Edge score.
-const W_POINTS = 0.45; // projected points
-const W_DEPLOY = 0.3; // expected workload
-const W_EFFICIENCY = 0.25; // points per opportunity
+// Sleeper's projections already bake in some game context, so the sportsbook
+// (Environment) piece is kept modest.
+const WEIGHTS_WITH_ODDS = { pts: 0.4, dep: 0.25, eff: 0.2, env: 0.15 };
+const WEIGHTS_NO_ODDS = { pts: 0.45, dep: 0.3, eff: 0.25, env: 0 };
+
+// Implied team scores run from roughly 16 (bad) to 30 (great).
+const IMPLIED_LOW = 16;
+const IMPLIED_HIGH = 30;
 
 /* ---------- Types for Sleeper's responses ---------- */
 
@@ -59,6 +66,14 @@ type RawProjection = {
   stats?: Record<string, number> | null;
 };
 
+type Env = {
+  total: number;
+  teamSpread: number; // negative = this team is favored
+  implied: number; // implied team score from the total and spread
+  isHome: boolean;
+  opp: string;
+};
+
 type Candidate = {
   id: string;
   name: string;
@@ -69,16 +84,25 @@ type Candidate = {
   opps: number;
   eff: number;
   injury: string;
+  env: Env | null;
 };
 
 /* ---------- Helpers ---------- */
 
 async function getJson<T>(path: string, revalidate: number): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { next: { revalidate } });
+  const res = await fetch(`${BASE}${path}`, {
+    next: { revalidate },
+    signal: AbortSignal.timeout(8000),
+  });
   if (!res.ok) {
     throw new Error(`Sleeper returned ${res.status} for ${path}`);
   }
   return (await res.json()) as T;
+}
+
+function demo(reason: string): BoardData {
+  console.error("Edge Board showing demo data:", reason);
+  return { ...DEMO_BOARD, reason };
 }
 
 function isPos(value: string | null | undefined): value is Pos {
@@ -99,6 +123,38 @@ function percentiles(values: number[]): number[] {
   return out;
 }
 
+function lineFor(games: GameLine[], team: string, opp: string): Env | null {
+  if (!team) return null;
+  let g = games.find(
+    (x) => (x.home === team && x.away === opp) || (x.away === team && x.home === opp)
+  );
+  // If Sleeper gave no opponent, fall back to the team's earliest listed game.
+  if (!g && !opp) {
+    g = games
+      .filter((x) => x.home === team || x.away === team)
+      .sort((a, b) => a.kickoff.localeCompare(b.kickoff))[0];
+  }
+  if (!g) return null;
+  const isHome = g.home === team;
+  const teamSpread = isHome ? g.homeSpread : -g.homeSpread;
+  return {
+    total: g.total,
+    teamSpread,
+    implied: g.total / 2 - teamSpread / 2,
+    isHome,
+    opp: isHome ? g.away : g.home,
+  };
+}
+
+function fmtSpread(n: number): string {
+  if (n === 0) return "PK";
+  return `${n > 0 ? "+" : ""}${n.toFixed(1)}`;
+}
+
+function clamp01(n: number): number {
+  return Math.max(0, Math.min(1, n));
+}
+
 // Injury designations that keep a player off the board entirely.
 const OUT_STATUSES = new Set(["Out", "IR", "PUP", "Sus", "NA", "DNR", "COV"]);
 
@@ -115,6 +171,7 @@ function buildNote(c: Candidate): string {
       ? `${opps} pass and rush attempts`
       : `${opps} ${opps === 1 ? "opportunity" : "opportunities"}`;
   let note = `Projected for ${c.pts.toFixed(1)} points on about ${workload}.`;
+  if (c.env) note += ` Books have ${c.team} at about ${c.env.implied.toFixed(1)} points.`;
   if (c.injury === "Questionable") note += " Listed as questionable, so check status before lock.";
   if (c.injury === "Doubtful") note += " Listed as doubtful. Have a backup ready.";
   return note;
@@ -140,7 +197,9 @@ export async function getBoard(): Promise<BoardData> {
 
     // Offseason or playoffs: keep the demo board instead of showing stale numbers.
     if (state.season_type !== "regular" || !state.week) {
-      return DEMO_BOARD;
+      return demo(
+        `Sleeper says the season type is "${state.season_type}" and the week is ${state.week}.`
+      );
     }
 
     const query =
@@ -153,7 +212,9 @@ export async function getBoard(): Promise<BoardData> {
     );
 
     if (!Array.isArray(raw) || raw.length === 0) {
-      return DEMO_BOARD;
+      return demo(
+        `Sleeper returned no projections for season ${state.season}, week ${state.week}.`
+      );
     }
 
     // Backup: only fetch the big player list if projections don't carry player info.
@@ -161,6 +222,9 @@ export async function getBoard(): Promise<BoardData> {
     if (raw.some((r) => !r.player)) {
       playerMap = await getJson<Record<string, RawPlayer>>("/v1/players/nfl", 86400);
     }
+
+    // Sportsbook lines. Never throws; returns no games if unavailable.
+    const oddsResult = await getGameLines();
 
     // 1. Turn raw rows into clean candidates.
     const candidates: Candidate[] = [];
@@ -184,18 +248,27 @@ export async function getBoard(): Promise<BoardData> {
       const name = `${info.first_name ?? ""} ${info.last_name ?? ""}`.trim();
       if (!name) continue;
 
+      const team = r.team ?? info.team ?? "";
+      const opp = r.opponent ?? "";
+
       candidates.push({
         id: r.player_id,
         name,
         pos,
-        team: r.team ?? info.team ?? "",
-        opp: r.opponent ?? "",
+        team,
+        opp,
         pts,
         opps,
         eff: pts / opps,
         injury,
+        env: lineFor(oddsResult.games, team, opp),
       });
     }
+
+    // Use the odds piece only if lines matched a healthy share of players.
+    const matched = candidates.filter((c) => c.env).length;
+    const hasOdds = candidates.length > 0 && matched / candidates.length >= 0.5;
+    const w = hasOdds ? WEIGHTS_WITH_ODDS : WEIGHTS_NO_ODDS;
 
     // 2. Score each position group against its own pool.
     const players: Player[] = [];
@@ -214,15 +287,24 @@ export async function getBoard(): Promise<BoardData> {
       const effPct = percentiles(group.map((c) => c.eff));
 
       group.forEach((c, i) => {
+        const envScore = c.env
+          ? clamp01((c.env.implied - IMPLIED_LOW) / (IMPLIED_HIGH - IMPLIED_LOW))
+          : 0.5;
         const raw100 =
-          100 * (W_POINTS * ptsPct[i] + W_DEPLOY * depPct[i] + W_EFFICIENCY * effPct[i]);
+          100 * (w.pts * ptsPct[i] + w.dep * depPct[i] + w.eff * effPct[i] + w.env * envScore);
         const edge = Math.max(0, Math.min(99, Math.round(raw100 - injuryPenalty(c.injury))));
 
         players.push({
           id: c.id,
           name: c.name,
           pos,
-          spot: c.team ? (c.opp ? `${c.team}, facing ${c.opp}` : c.team) : "Team unknown",
+          spot: c.env
+            ? `${c.team} ${c.env.isHome ? "vs." : "at"} ${c.env.opp}, O/U ${c.env.total}, ${c.team} ${fmtSpread(c.env.teamSpread)}`
+            : c.team
+              ? c.opp
+                ? `${c.team}, facing ${c.opp}`
+                : c.team
+              : "Team unknown",
           edge,
           gap: Math.round((c.pts - replacementPts) * 10) / 10,
           note: buildNote(c),
@@ -230,7 +312,11 @@ export async function getBoard(): Promise<BoardData> {
       });
     }
 
-    if (players.length < 10) return DEMO_BOARD;
+    if (players.length < 10) {
+      return demo(
+        `Read ${raw.length} projection rows but only ${players.length} were usable. First row: ${JSON.stringify(raw[0]).slice(0, 400)}`
+      );
+    }
 
     return {
       week: state.week,
@@ -238,9 +324,14 @@ export async function getBoard(): Promise<BoardData> {
       updated: updatedLabel(),
       gapLabel: "pts over replacement",
       players,
+      odds: hasOdds,
+      oddsNote: hasOdds
+        ? `${oddsResult.note} Matched ${matched} of ${candidates.length} players to a game.`
+        : oddsResult.games.length > 0
+          ? `Odds loaded, but only ${matched} of ${candidates.length} players matched a game.`
+          : oddsResult.note,
     };
   } catch (err) {
-    console.error("Sleeper board failed, using demo data:", err);
-    return { ...DEMO_BOARD, week: DEMO_WEEK };
+    return demo(`Sleeper request failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }

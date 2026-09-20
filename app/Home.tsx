@@ -61,6 +61,11 @@ const FACTORS: Factor[] = [
    ========================================================== */
 
 export default function Home({ board }: { board: BoardData }) {
+  const factors: Factor[] = FACTORS.map((f) =>
+    f.title === "Environment" && board.odds
+      ? { ...f, status: "Partly live" as const, live: "Live now: Vegas total and spread." }
+      : f
+  );
   const [pos, setPos] = useState<"All" | Pos>("All");
   const [callFilter, setCallFilter] = useState<"All" | Call>("All");
 
@@ -213,8 +218,12 @@ export default function Home({ board }: { board: BoardData }) {
               <p className="live-note">
                 Live from Sleeper projections, refreshed {board.updated}. Today&apos;s Edge
                 score blends projected points, expected workload, and efficiency, with a
-                penalty for injury designations. The rest of the EDGE Framework is rolling
-                in.
+                penalty for injury designations.
+                {board.odds && " Sportsbook totals and spreads are included."} The rest of
+                the EDGE Framework is rolling in.
+                {board.oddsNote && (
+                  <span className="reason">Odds: {board.oddsNote}</span>
+                )}
               </p>
             ) : (
               <p className="demo-note">
@@ -366,7 +375,7 @@ export default function Home({ board }: { board: BoardData }) {
               Every player is evaluated through the EDGE Framework:
             </p>
             <div className="method-grid">
-              {FACTORS.map((f) => (
+              {factors.map((f) => (
                 <div key={f.title} className="factor">
                   <div className="factor-letter" aria-hidden="true">
                     {f.letter}

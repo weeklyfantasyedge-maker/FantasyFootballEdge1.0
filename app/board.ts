@@ -23,6 +23,8 @@ export type BoardData = {
   gapLabel: string;
   players: Player[];
   reason?: string; // why the demo board is showing (for troubleshooting)
+  odds?: boolean; // true when sportsbook lines were applied
+  oddsNote?: string; // status of the odds feed (for troubleshooting)
 };
 
 // Edge score cutoffs that decide each call.
