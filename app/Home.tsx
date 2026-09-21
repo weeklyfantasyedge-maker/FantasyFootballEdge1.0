@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import Image from "next/image";
 import logo from "./logo.png";
+import FieldLines from "./FieldLines";
+import { SiteFooter, SiteNav } from "./SiteChrome";
 import { CALL_COLOR, FLEX_AT, START_AT, callFor } from "./board";
 import type { BoardData, Call, Pos } from "./board";
 
@@ -66,6 +68,13 @@ export default function Home({ board }: { board: BoardData }) {
       ? { ...f, status: "Partly live" as const, live: "Live now: Vegas total and spread." }
       : f
   );
+  // Troubleshooting lines are hidden unless the address ends with ?debug=1
+  const [debug, setDebug] = useState(false);
+  useEffect(() => {
+    setDebug(new URLSearchParams(window.location.search).has("debug"));
+  }, []);
+
+  const [openId, setOpenId] = useState<string | null>(null);
   const [pos, setPos] = useState<"All" | Pos>("All");
   const [callFilter, setCallFilter] = useState<"All" | Call>("All");
 
@@ -122,46 +131,12 @@ export default function Home({ board }: { board: BoardData }) {
 
   return (
     <>
-      {/* ---------- NAV ---------- */}
-      <header className="nav">
-        <div className="wrap nav-inner">
-          <a href="#top" className="brand" aria-label="Fantasy Football Edge home">
-            <Image src={logo} alt="" className="brand-mark" width={44} height={44} />
-            <span className="brand-name">
-              Fantasy Football <em>Edge</em>
-            </span>
-          </a>
-          <nav className="nav-links" aria-label="Main">
-            <a href="#board">Edge Board</a>
-            <a href="#system">Start / Flex / Sit</a>
-            <a href="#method">Method</a>
-            <a href="#intake" className="btn btn-solid btn-sm">
-              <span>Get lineup help</span>
-            </a>
-          </nav>
-        </div>
-      </header>
+      <SiteNav />
 
       <main id="top">
         {/* ---------- HERO ---------- */}
         <section className="hero">
-          <svg
-            className="hero-mtn"
-            viewBox="0 0 1440 300"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <defs>
-              <linearGradient id="mtn" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="#4a6580" stopOpacity="0.55" />
-                <stop offset="1" stopColor="#22374d" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path
-              d="M0 300V210L120 150L220 200L360 80L470 180L600 120L740 210L880 60L1010 170L1150 110L1290 190L1440 120V300Z"
-              fill="url(#mtn)"
-            />
-          </svg>
+          <FieldLines />
 
           <div className="hero-bars" aria-hidden="true">
             {HERO_BARS.map((h, i) => (
@@ -221,7 +196,7 @@ export default function Home({ board }: { board: BoardData }) {
                 penalty for injury designations.
                 {board.odds && " Sportsbook totals and spreads are included."} The rest of
                 the EDGE Framework is rolling in.
-                {board.oddsNote && (
+                {debug && board.oddsNote && (
                   <span className="reason">Odds: {board.oddsNote}</span>
                 )}
               </p>
@@ -229,7 +204,7 @@ export default function Home({ board }: { board: BoardData }) {
               <p className="demo-note">
                 Demo data. These players and scores are placeholders until the live
                 weekly board is published.
-                {board.reason && <span className="reason">Why: {board.reason}</span>}
+                {debug && board.reason && <span className="reason">Why: {board.reason}</span>}
               </p>
             )}
 
@@ -262,7 +237,7 @@ export default function Home({ board }: { board: BoardData }) {
                       setVisible(PAGE_SIZE);
                     }}
                   >
-                    {c === "All" ? "All calls" : c}
+                    {c === "All" ? "EDGE Rankings" : c}
                   </button>
                 ))}
               </div>
@@ -287,6 +262,17 @@ export default function Home({ board }: { board: BoardData }) {
                           {p.spot}
                         </div>
                         <p className="who-note">{p.note}</p>
+                        {p.report && (
+                          <button
+                            type="button"
+                            className="report-toggle"
+                            aria-expanded={openId === p.id}
+                            onClick={() => setOpenId(openId === p.id ? null : p.id)}
+                          >
+                            {openId === p.id ? "Hide report" : "Full report"}
+                            <span aria-hidden="true" className="chev" />
+                          </button>
+                        )}
                       </div>
                       <div className="call">{p.call}</div>
                       <div className="edge">
@@ -307,6 +293,42 @@ export default function Home({ board }: { board: BoardData }) {
                           {p.gap.toFixed(1)} {board.gapLabel}
                         </div>
                       </div>
+                      {p.report && openId === p.id && (
+                        <div className="report">
+                          <dl className="report-stats">
+                            <div>
+                              <dt>Game total (O/U)</dt>
+                              <dd>{p.report.gameTotal ?? "Not available"}</dd>
+                            </div>
+                            <div>
+                              <dt>{p.report.team || "Team"} team total</dt>
+                              <dd>{p.report.teamTotal ?? "Not available"}</dd>
+                            </div>
+                            <div>
+                              <dt>Spread</dt>
+                              <dd>
+                                {p.report.teamSpread === null
+                                  ? "Not available"
+                                  : `${p.report.team} ${
+                                      p.report.teamSpread === 0
+                                        ? "PK"
+                                        : (p.report.teamSpread > 0 ? "+" : "") +
+                                          p.report.teamSpread.toFixed(1)
+                                    }`}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>{p.report.propLabel} line</dt>
+                              <dd>{p.report.propLine ?? "Not posted"}</dd>
+                            </div>
+                          </dl>
+                          <p className="report-summary">{p.report.summary}</p>
+                          <p className="report-fine">
+                            Summary is generated from the numbers above. Lines are the consensus
+                            of US sportsbooks, saved before kickoff.
+                          </p>
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -486,17 +508,7 @@ export default function Home({ board }: { board: BoardData }) {
         </section>
       </main>
 
-      {/* ---------- FOOTER ---------- */}
-      <footer className="footer">
-        <div className="wrap footer-grid">
-          <div className="footer-tag">I do the research. You set the lineup.</div>
-          <p className="fine">
-            Fantasy Football Edge is for entertainment. Calls are informed opinions,
-            not guarantees. Always check the latest injury news before your lineup locks.
-            {board.live && " Projections and injury data from Sleeper."}
-          </p>
-        </div>
-      </footer>
+      <SiteFooter live={board.live} />
     </>
   );
 }

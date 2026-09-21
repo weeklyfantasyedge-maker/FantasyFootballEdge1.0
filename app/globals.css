@@ -193,14 +193,6 @@ a {
     #000;
 }
 
-.hero-mtn {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  height: 46%;
-  pointer-events: none;
-}
 
 .hero-bars {
   position: absolute;
@@ -772,7 +764,17 @@ a {
 }
 
 @media (max-width: 720px) {
-  .nav-links a:not(.btn) {
+  .nav-links a:not(.btn):not(.nav-keep) {
+    display: none;
+  }
+
+  .nav-links {
+    gap: 1.1rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .brand-name {
     display: none;
   }
 }
@@ -883,4 +885,301 @@ a {
   margin: 0.9rem 0 0;
   color: var(--steel);
   font-size: 0.92rem;
+}
+
+/* ==========================================================
+   Update 4: field-line hero, full reports, Terms page
+   ========================================================== */
+
+/* ---------- Hero: football field paint lines ---------- */
+
+.hero-field {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: min(60%, 580px);
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to top, #000 45%, transparent 95%);
+  mask-image: linear-gradient(to top, #000 45%, transparent 95%);
+}
+
+.hero-field svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ff-lines line {
+  stroke: var(--dusk-hi);
+  fill: none;
+}
+
+.ff-thin {
+  stroke-width: 1.5;
+  opacity: 0.32;
+}
+
+.ff-mid {
+  stroke-width: 2.5;
+  opacity: 0.4;
+}
+
+.ff-thick {
+  stroke-width: 4;
+  opacity: 0.48;
+}
+
+.ff-nums text {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 54px;
+  fill: var(--dusk-hi);
+  opacity: 0.45;
+}
+
+.ff-nums polygon {
+  fill: var(--dusk-hi);
+  opacity: 0.4;
+}
+
+.ff-endzone {
+  font-family: var(--font-marker);
+  font-size: 64px;
+  fill: var(--green);
+  opacity: 0.1;
+}
+
+/* ---------- Edge Board: full report ---------- */
+
+.report-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+  padding: 0.2rem 0;
+  border: 0;
+  background: none;
+  color: var(--green);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.report-toggle:hover {
+  text-decoration: underline;
+}
+
+.chev {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.15s;
+}
+
+.report-toggle[aria-expanded="true"] .chev {
+  transform: rotate(-135deg) translateY(-2px);
+}
+
+.report {
+  grid-column: 1 / -1;
+  margin: 0.4rem 0 0.2rem;
+  padding: 1.25rem 1.25rem 1rem;
+  background: var(--panel);
+  border-left: 4px solid var(--call);
+}
+
+.report-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem 1.5rem;
+  margin: 0;
+}
+
+.report-stats dt {
+  color: var(--steel);
+  font-size: 0.9rem;
+}
+
+.report-stats dd {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.7rem;
+  line-height: 1.1;
+}
+
+.report-summary {
+  margin: 1.1rem 0 0;
+  max-width: 70ch;
+  color: #dfe5ea;
+}
+
+.report-fine {
+  margin: 0.6rem 0 0;
+  color: var(--steel);
+  font-size: 0.85rem;
+}
+
+/* ---------- Footer link ---------- */
+
+.fine-link {
+  color: var(--green);
+}
+
+/* ---------- Terms page ---------- */
+
+.terms-head {
+  padding-top: clamp(2.5rem, 6vw, 4.5rem);
+}
+
+.terms-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem 2rem;
+  margin-top: 2.25rem;
+}
+
+.search {
+  display: block;
+  width: min(100%, 380px);
+}
+
+.search > span {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+  font-size: 0.98rem;
+}
+
+.search input {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(242, 242, 238, 0.25);
+  border-radius: 0;
+  background: #000;
+  color: var(--chalk);
+  font: inherit;
+}
+
+.search input::placeholder {
+  color: #66717c;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.legend-note {
+  flex-basis: 100%;
+  color: var(--steel);
+  font-size: 0.92rem;
+  max-width: 70ch;
+}
+
+.pill {
+  display: inline-block;
+  padding: 0.1rem 0.6rem;
+  border: 1px solid currentColor;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.pill.live {
+  color: var(--green);
+}
+
+.pill.soon {
+  color: var(--amber);
+}
+
+.pill.licensed {
+  color: var(--red);
+}
+
+.pill.ref {
+  color: var(--steel);
+}
+
+.term-list {
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.term {
+  display: grid;
+  grid-template-columns: minmax(200px, 300px) 1fr;
+  gap: 0.5rem 2.5rem;
+  padding: 1.5rem 0;
+  border-bottom: 1px solid var(--line);
+  scroll-margin-top: 80px;
+}
+
+.term h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.7rem;
+  line-height: 1.05;
+}
+
+.term-cat {
+  margin: 0.3rem 0 0.55rem;
+  color: var(--steel);
+  font-size: 0.92rem;
+}
+
+.term p {
+  margin: 0 0 0.6rem;
+  max-width: 64ch;
+  color: #dfe5ea;
+}
+
+.term p.why {
+  color: var(--steel);
+}
+
+.term p.why strong {
+  color: var(--chalk);
+  font-weight: 600;
+}
+
+@media (max-width: 800px) {
+  .report-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .report {
+    margin-left: 0;
+  }
+
+  .term {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+}
+
+.nav-links .btn {
+  white-space: nowrap;
+}
+
+/* Field lines: lighter and shorter on phones so text stays readable */
+@media (max-width: 720px) {
+  .hero-field {
+    height: 40%;
+    opacity: 0.7;
+  }
 }

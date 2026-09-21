@@ -12,9 +12,9 @@
    site never shows an error page.
    ========================================================== */
 
-import { DEMO_BOARD } from "./board";
-import { getGameLines } from "./odds";
-import type { GameLine } from "./odds";
+import { DEMO_BOARD, callFor } from "./board";
+import { getWeekLines, normName } from "./odds";
+import type { GameLine, PropMarket, PropRow } from "./odds";
 import type { BoardData, Player, Pos } from "./board";
 
 /* ---------- Settings you can change ---------- */
@@ -67,6 +67,7 @@ type RawProjection = {
 };
 
 type Env = {
+  eventId: string;
   total: number;
   teamSpread: number; // negative = this team is favored
   implied: number; // implied team score from the total and spread
@@ -85,6 +86,7 @@ type Candidate = {
   eff: number;
   injury: string;
   env: Env | null;
+  propLine: number | null;
 };
 
 /* ---------- Helpers ---------- */
@@ -138,6 +140,7 @@ function lineFor(games: GameLine[], team: string, opp: string): Env | null {
   const isHome = g.home === team;
   const teamSpread = isHome ? g.homeSpread : -g.homeSpread;
   return {
+    eventId: g.eventId,
     total: g.total,
     teamSpread,
     implied: g.total / 2 - teamSpread / 2,
@@ -162,6 +165,58 @@ function injuryPenalty(status: string): number {
   if (status === "Doubtful") return 35;
   if (status === "Questionable") return 12;
   return 0;
+}
+
+// Which sportsbook prop goes with each position.
+const PROP_MARKET: Record<Pos, PropMarket> = { QB: "pass", RB: "rush", WR: "rec", TE: "rec" };
+const PROP_LABEL: Record<Pos, string> = {
+  QB: "Passing yards",
+  RB: "Rushing yards",
+  WR: "Receiving yards",
+  TE: "Receiving yards",
+};
+
+function propFor(rows: PropRow[] | undefined, name: string, pos: Pos): number | null {
+  if (!rows) return null;
+  const key = normName(name);
+  const hit = rows.find((r) => r.key === key && r.market === PROP_MARKET[pos]);
+  return hit ? hit.line : null;
+}
+
+function buildSummary(c: Candidate, edge: number): string {
+  const label = PROP_LABEL[c.pos].toLowerCase();
+  const parts: string[] = [];
+
+  if (c.env) {
+    const e = c.env;
+    const role =
+      e.teamSpread < 0
+        ? `a ${Math.abs(e.teamSpread)}-point favorite`
+        : e.teamSpread > 0
+          ? `a ${e.teamSpread}-point underdog`
+          : "a pick'em";
+    parts.push(
+      `${c.team} ${e.isHome ? "is at home against" : "is on the road at"} ${e.opp} as ${role} in a game with a ${e.total}-point total, which puts the team total near ${e.implied.toFixed(1)}.`
+    );
+    parts.push(
+      c.propLine !== null
+        ? `The ${label} line for ${c.name} is ${c.propLine}.`
+        : `No ${label} line is posted for ${c.name} yet.`
+    );
+  } else {
+    parts.push("Sportsbook lines are not available for this game.");
+  }
+
+  const workload = c.pos === "QB" ? "pass and rush attempts" : "carries and targets";
+  parts.push(
+    `Sleeper projects ${c.pts.toFixed(1)} points on about ${Math.round(c.opps)} ${workload}.`
+  );
+  parts.push(`That gives him an Edge score of ${edge}, which is a ${callFor(edge)} call.`);
+
+  if (c.injury === "Questionable") parts.push("He is listed as questionable, so check his status before lock.");
+  if (c.injury === "Doubtful") parts.push("He is listed as doubtful. Have a backup ready.");
+
+  return parts.join(" ");
 }
 
 function buildNote(c: Candidate): string {
@@ -223,8 +278,8 @@ export async function getBoard(): Promise<BoardData> {
       playerMap = await getJson<Record<string, RawPlayer>>("/v1/players/nfl", 86400);
     }
 
-    // Sportsbook lines. Never throws; returns no games if unavailable.
-    const oddsResult = await getGameLines();
+    // Sportsbook lines and player props. Never throws.
+    const oddsResult = await getWeekLines(state.season, state.week);
 
     // 1. Turn raw rows into clean candidates.
     const candidates: Candidate[] = [];
@@ -251,6 +306,8 @@ export async function getBoard(): Promise<BoardData> {
       const team = r.team ?? info.team ?? "";
       const opp = r.opponent ?? "";
 
+      const env = lineFor(oddsResult.games, team, opp);
+
       candidates.push({
         id: r.player_id,
         name,
@@ -261,7 +318,8 @@ export async function getBoard(): Promise<BoardData> {
         opps,
         eff: pts / opps,
         injury,
-        env: lineFor(oddsResult.games, team, opp),
+        env,
+        propLine: env ? propFor(oddsResult.props[env.eventId], name, pos) : null,
       });
     }
 
@@ -308,6 +366,17 @@ export async function getBoard(): Promise<BoardData> {
           edge,
           gap: Math.round((c.pts - replacementPts) * 10) / 10,
           note: buildNote(c),
+          report: {
+            team: c.team,
+            opp: c.env ? c.env.opp : c.opp,
+            isHome: c.env ? c.env.isHome : false,
+            gameTotal: c.env ? c.env.total : null,
+            teamSpread: c.env ? c.env.teamSpread : null,
+            teamTotal: c.env ? Math.round(c.env.implied * 10) / 10 : null,
+            propLabel: PROP_LABEL[pos],
+            propLine: c.propLine,
+            summary: buildSummary(c, edge),
+          },
         });
       });
     }
@@ -325,11 +394,7 @@ export async function getBoard(): Promise<BoardData> {
       gapLabel: "pts over replacement",
       players,
       odds: hasOdds,
-      oddsNote: hasOdds
-        ? `${oddsResult.note} Matched ${matched} of ${candidates.length} players to a game.`
-        : oddsResult.games.length > 0
-          ? `Odds loaded, but only ${matched} of ${candidates.length} players matched a game.`
-          : oddsResult.note,
+      oddsNote: `${oddsResult.note} Matched ${matched} of ${candidates.length} players to a game.`,
     };
   } catch (err) {
     return demo(`Sleeper request failed: ${err instanceof Error ? err.message : String(err)}`);

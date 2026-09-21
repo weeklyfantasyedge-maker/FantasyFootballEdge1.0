@@ -6,6 +6,19 @@
 export type Pos = "QB" | "RB" | "WR" | "TE";
 export type Call = "Start" | "Flex" | "Sit";
 
+// The "Full report" that opens under a player on the board.
+export type PlayerReport = {
+  team: string;
+  opp: string;
+  isHome: boolean;
+  gameTotal: number | null; // game over/under
+  teamSpread: number | null; // negative = this team is favored
+  teamTotal: number | null; // implied points for this player's team
+  propLabel: string; // "Passing yards", "Rushing yards", or "Receiving yards"
+  propLine: number | null; // sportsbook line for that stat
+  summary: string; // generated from the numbers, not hand-written
+};
+
 export type Player = {
   id: string;
   name: string;
@@ -14,6 +27,7 @@ export type Player = {
   edge: number; // 0 to 100
   gap: number; // points above replacement (live) or vs. consensus (demo)
   note: string;
+  report?: PlayerReport;
 };
 
 export type BoardData = {
