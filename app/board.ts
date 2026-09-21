@@ -17,14 +17,14 @@ export type Player = {
 };
 
 export type BoardData = {
-  week: number | null; // null = week unknown (offseason, or Sleeper unreachable)
+  week: number;
   live: boolean; // true = real Sleeper data, false = demo fallback
   updated: string | null; // "Sep 20, 3:00 PM ET"
   gapLabel: string;
   players: Player[];
-  reason?: string; // why the demo board is showing (logged on the server, never shown to visitors)
+  reason?: string; // why the demo board is showing (for troubleshooting)
   odds?: boolean; // true when sportsbook lines were applied
-  oddsNote?: string; // status of the odds feed (logged on the server, never shown to visitors)
+  oddsNote?: string; // status of the odds feed (for troubleshooting)
 };
 
 // Edge score cutoffs that decide each call.
@@ -49,6 +49,8 @@ export function callFor(edge: number): Call {
    so the site never breaks.
    ========================================================== */
 
+export const DEMO_WEEK = 3;
+
 type DemoRow = Omit<Player, "id">;
 
 const DEMO_ROWS: DemoRow[] = [
@@ -67,7 +69,7 @@ const DEMO_ROWS: DemoRow[] = [
 ];
 
 export const DEMO_BOARD: BoardData = {
-  week: null,
+  week: DEMO_WEEK,
   live: false,
   updated: null,
   gapLabel: "pts vs. consensus",

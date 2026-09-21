@@ -100,11 +100,9 @@ async function getJson<T>(path: string, revalidate: number): Promise<T> {
   return (await res.json()) as T;
 }
 
-// The reason is only logged (Vercel: project, Logs). Visitors never see it.
-// If Sleeper told us the current week, the demo board carries it; otherwise no week is shown.
-function demo(reason: string, week: number | null = null): BoardData {
+function demo(reason: string): BoardData {
   console.error("Edge Board showing demo data:", reason);
-  return { ...DEMO_BOARD, week, reason };
+  return { ...DEMO_BOARD, reason };
 }
 
 function isPos(value: string | null | undefined): value is Pos {
@@ -194,9 +192,6 @@ function updatedLabel(): string {
 /* ---------- Main ---------- */
 
 export async function getBoard(): Promise<BoardData> {
-  // Set once Sleeper confirms a regular-season week, so any later fallback can still show it.
-  let knownWeek: number | null = null;
-
   try {
     const state = await getJson<RawState>("/v1/state/nfl", 900);
 
@@ -206,7 +201,6 @@ export async function getBoard(): Promise<BoardData> {
         `Sleeper says the season type is "${state.season_type}" and the week is ${state.week}.`
       );
     }
-    knownWeek = state.week;
 
     const query =
       `?season_type=regular&order_by=${SCORING}` +
@@ -219,8 +213,7 @@ export async function getBoard(): Promise<BoardData> {
 
     if (!Array.isArray(raw) || raw.length === 0) {
       return demo(
-        `Sleeper returned no projections for season ${state.season}, week ${state.week}.`,
-        knownWeek
+        `Sleeper returned no projections for season ${state.season}, week ${state.week}.`
       );
     }
 
@@ -321,19 +314,9 @@ export async function getBoard(): Promise<BoardData> {
 
     if (players.length < 10) {
       return demo(
-        `Read ${raw.length} projection rows but only ${players.length} were usable. First row: ${JSON.stringify(raw[0]).slice(0, 400)}`,
-        knownWeek
+        `Read ${raw.length} projection rows but only ${players.length} were usable. First row: ${JSON.stringify(raw[0]).slice(0, 400)}`
       );
     }
-
-    const oddsNote = hasOdds
-      ? `${oddsResult.note} Matched ${matched} of ${candidates.length} players to a game.`
-      : oddsResult.games.length > 0
-        ? `Odds loaded, but only ${matched} of ${candidates.length} players matched a game.`
-        : oddsResult.note;
-
-    // Troubleshooting info goes to the server log, not the page.
-    console.log(`Edge Board week ${state.week}. Odds feed: ${oddsNote}`);
 
     return {
       week: state.week,
@@ -342,12 +325,13 @@ export async function getBoard(): Promise<BoardData> {
       gapLabel: "pts over replacement",
       players,
       odds: hasOdds,
-      oddsNote,
+      oddsNote: hasOdds
+        ? `${oddsResult.note} Matched ${matched} of ${candidates.length} players to a game.`
+        : oddsResult.games.length > 0
+          ? `Odds loaded, but only ${matched} of ${candidates.length} players matched a game.`
+          : oddsResult.note,
     };
   } catch (err) {
-    return demo(
-      `Sleeper request failed: ${err instanceof Error ? err.message : String(err)}`,
-      knownWeek
-    );
+    return demo(`Sleeper request failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }

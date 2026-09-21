@@ -206,9 +206,7 @@ export default function Home({ board }: { board: BoardData }) {
           <div className="wrap">
             <div className="board-head">
               <div>
-                <h2 className="h2">
-                  Edge Board{board.week ? `: Week ${board.week}` : ""}
-                </h2>
+                <h2 className="h2">Edge Board: Week {board.week}</h2>
                 <p className="lede">
                   Every player gets an Edge score from 0 to 100. The higher the score,
                   the more the numbers back him this week.
@@ -223,11 +221,15 @@ export default function Home({ board }: { board: BoardData }) {
                 penalty for injury designations.
                 {board.odds && " Sportsbook totals and spreads are included."} The rest of
                 the EDGE Framework is rolling in.
+                {board.oddsNote && (
+                  <span className="reason">Odds: {board.oddsNote}</span>
+                )}
               </p>
             ) : (
               <p className="demo-note">
                 Demo data. These players and scores are placeholders until the live
                 weekly board is published.
+                {board.reason && <span className="reason">Why: {board.reason}</span>}
               </p>
             )}
 
